@@ -9,7 +9,7 @@ name: supabase
 
 services:
   studio:
-    container_name: supabase-studio
+    container_name: supabase-studio-${PROJECT_NAME}
     image: supabase/studio:20250113-83c9420
     restart: unless-stopped
     healthcheck:
@@ -47,9 +47,11 @@ services:
       NEXT_ANALYTICS_BACKEND_PROVIDER: postgres
       # Uncomment to use Big Query backend for analytics
       # NEXT_ANALYTICS_BACKEND_PROVIDER: bigquery
+    networks:
+      - dokploy-network
 
   kong:
-    container_name: supabase-kong
+    container_name: supabase-kong-${PROJECT_NAME}
     image: kong:2.8.1
     restart: unless-stopped
     # https://unix.stackexchange.com/a/294837
@@ -75,9 +77,11 @@ services:
     volumes:
       # https://github.com/supabase/supabase/issues/12661
       - ./volumes/api/kong.yml:/home/kong/temp.yml:ro
+    networks:
+      - dokploy-network
 
   auth:
-    container_name: supabase-auth
+    container_name: supabase-auth-${PROJECT_NAME}
     image: supabase/gotrue:v2.167.0
     depends_on:
       db:
@@ -158,9 +162,11 @@ services:
       # GOTRUE_HOOK_SEND_EMAIL_ENABLED: "false"
       # GOTRUE_HOOK_SEND_EMAIL_URI: "http://host.docker.internal:54321/functions/v1/email_sender"
       # GOTRUE_HOOK_SEND_EMAIL_SECRETS: "v1,whsec_VGhpcyBpcyBhbiBleGFtcGxlIG9mIGEgc2hvcnRlciBCYXNlNjQgc3RyaW5n"
+    networks:
+      - dokploy-network
 
   rest:
-    container_name: supabase-rest
+    container_name: supabase-rest-${PROJECT_NAME}
     image: postgrest/postgrest:v12.2.0
     depends_on:
       db:
@@ -178,10 +184,12 @@ services:
       PGRST_APP_SETTINGS_JWT_SECRET: ${JWT_SECRET}
       PGRST_APP_SETTINGS_JWT_EXP: ${JWT_EXPIRY}
     command: "postgrest"
+    networks:
+      - dokploy-network
 
   realtime:
     # This container name looks inconsistent but is correct because realtime constructs tenant id by parsing the subdomain
-    container_name: realtime-dev.supabase-realtime
+    container_name: realtime-dev.supabase-realtime-${PROJECT_NAME}
     image: supabase/realtime:v2.33.70
     depends_on:
       db:
@@ -223,10 +231,12 @@ services:
       APP_NAME: realtime
       SEED_SELF_HOST: true
       RUN_JANITOR: true
+    networks:
+      - dokploy-network
 
   # To use S3 backed storage: docker compose -f docker-compose.yml -f docker-compose.s3.yml up
   storage:
-    container_name: supabase-storage
+    container_name: supabase-storage-${PROJECT_NAME}
     image: supabase/storage-api:v1.14.5
     depends_on:
       db:
@@ -267,9 +277,11 @@ services:
       IMGPROXY_URL: http://imgproxy:5001
     volumes:
       - ./volumes/storage:/var/lib/storage:z
+    networks:
+      - dokploy-network
 
   imgproxy:
-    container_name: supabase-imgproxy
+    container_name: supabase-imgproxy-${PROJECT_NAME}
     image: darthsim/imgproxy:v3.8.0
     healthcheck:
       test: [ "CMD", "imgproxy", "health" ]
@@ -283,9 +295,11 @@ services:
       IMGPROXY_ENABLE_WEBP_DETECTION: ${IMGPROXY_ENABLE_WEBP_DETECTION}
     volumes:
       - ./volumes/storage:/var/lib/storage:z
+    networks:
+      - dokploy-network
 
   meta:
-    container_name: supabase-meta
+    container_name: supabase-meta-${PROJECT_NAME}
     image: supabase/postgres-meta:v0.84.2
     depends_on:
       db:
@@ -301,9 +315,11 @@ services:
       PG_META_DB_NAME: ${POSTGRES_DB}
       PG_META_DB_USER: supabase_admin
       PG_META_DB_PASSWORD: ${POSTGRES_PASSWORD}
+    networks:
+      - dokploy-network
 
   functions:
-    container_name: supabase-edge-functions
+    container_name: supabase-edge-functions-${PROJECT_NAME}
     image: supabase/edge-runtime:v1.66.4
     restart: unless-stopped
     depends_on:
@@ -323,9 +339,11 @@ services:
       - start
       - --main-service
       - /home/deno/functions/main
+    networks:
+      - dokploy-network
 
   analytics:
-    container_name: supabase-analytics
+    container_name: supabase-analytics-${PROJECT_NAME}
     image: supabase/logflare:1.4.0
     healthcheck:
       test: [ "CMD", "curl", "http://localhost:4000/health" ]
@@ -365,10 +383,12 @@ services:
       # GOOGLE_PROJECT_NUMBER: ${GOOGLE_PROJECT_NUMBER}
     ports:
       - 4000:4000
+    networks:
+      - dokploy-network
 
   # Comment out everything below this point if you are using an external Postgres database
   db:
-    container_name: supabase-db
+    container_name: supabase-db-${PROJECT_NAME}
     image: supabase/postgres:15.8.1.020
     healthcheck:
       test: pg_isready -U postgres -h localhost
@@ -413,9 +433,11 @@ services:
       - ./volumes/db/pooler.sql:/docker-entrypoint-initdb.d/migrations/99-pooler.sql:Z
       # Use named volume to persist pgsodium decryption key between restarts
       - db-config:/etc/postgresql-custom
+    networks:
+      - dokploy-network
 
   vector:
-    container_name: supabase-vector
+    container_name: supabase-vector-${PROJECT_NAME}
     image: timberio/vector:0.28.1-alpine
     healthcheck:
       test:
@@ -437,10 +459,12 @@ services:
     environment:
       LOGFLARE_API_KEY: ${LOGFLARE_API_KEY}
     command: [ "--config", "/etc/vector/vector.yml" ]
+    networks:
+      - dokploy-network
 
   # Update the DATABASE_URL if you are using an external Postgres database
   supavisor:
-    container_name: supabase-pooler
+    container_name: supabase-pooler-${PROJECT_NAME}
     image: supabase/supavisor:1.1.56
     healthcheck:
       test: curl -sSfL --head -o /dev/null "http://127.0.0.1:4000/api/health"
@@ -479,6 +503,11 @@ services:
       - POOLER_POOL_MODE=transaction
     volumes:
       - ./volumes/pooler/pooler.exs:/etc/pooler/pooler.exs:ro
+    networks:
+      - dokploy-network
 
 volumes:
   db-config:
+networks:
+  dokploy-network:
+    external: true
